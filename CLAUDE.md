@@ -1,19 +1,15 @@
-# Claude Cookbooks
+# CLAUDE.md
 
-A collection of Jupyter notebooks and Python examples for building with the Claude API.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+> **繁體中文版：** [docs/zh-TW/CLAUDE.md](docs/zh-TW/CLAUDE.md)
 
 ## Quick Start
 
 ```bash
-# Install dependencies
-uv sync --all-extras
-
-# Install pre-commit hooks
-uv run pre-commit install
-
-# Set up API key
-cp .env.example .env
-# Edit .env and add your ANTHROPIC_API_KEY
+uv sync --all-extras            # Install dependencies
+uv run pre-commit install       # Install pre-commit hooks
+cp .env.example .env            # Set up API key (edit .env with your ANTHROPIC_API_KEY)
 ```
 
 ## Development Commands
@@ -21,27 +17,27 @@ cp .env.example .env
 ```bash
 make format        # Format code with ruff
 make lint          # Run linting
-make check         # Run format-check + lint
+make check         # Run format-check + lint (run before committing)
 make fix           # Auto-fix issues + format
 make test          # Run pytest
 ```
 
-Or directly with uv:
+### Notebook Testing
 
 ```bash
-uv run ruff format .           # Format
-uv run ruff check .            # Lint
-uv run ruff check --fix .      # Auto-fix
-uv run pre-commit run --all-files
+# Structure tests (fast, no API calls)
+make test-notebooks                                        # All notebooks
+make test-notebooks NOTEBOOK=tool_use/calculator_tool.ipynb  # Single notebook
+make test-notebooks NOTEBOOK_DIR=capabilities              # Single directory
+
+# Execution tests (slow, requires ANTHROPIC_API_KEY)
+make test-notebooks-exec NOTEBOOK=tool_use/calculator_tool.ipynb
 ```
 
 ## Code Style
 
-- **Line length:** 100 characters
-- **Quotes:** Double quotes
-- **Formatter:** Ruff
-
-Notebooks have relaxed rules for mid-file imports (E402), redefinitions (F811), and variable naming (N803, N806).
+- **Line length:** 100 characters | **Quotes:** Double | **Formatter:** Ruff
+- Notebooks have relaxed rules for mid-file imports (E402), redefinitions (F811), and variable naming (N803, N806)
 
 ## Git Workflow
 
@@ -78,33 +74,74 @@ style: lint/format
    - One concept per notebook
    - Test that notebooks run top-to-bottom without errors
 
-5. **Quality checks:** Run `make check` before committing. Pre-commit hooks validate formatting and notebook structure.
+5. **Quality checks:** Run `make check` before committing.
+
+## Pre-commit Hooks
+
+Hooks run automatically on commit: ruff formatting, ruff linting (with auto-fix), notebook structure validation (`scripts/validate_notebooks.py`), and `authors.yaml` sort order.
+
+## CI Workflows
+
+All workflows are automatically triggered. No workflow is manual-only.
+
+### On Pull Request (all 9 workflows)
+
+| Workflow | Trigger paths | Notes |
+|---|---|---|
+| **lint-format** | `.py`, `.ipynb`, `pyproject.toml`, `uv.lock`, `Makefile` | |
+| **notebook-tests** | `.ipynb`, `tests/notebook_tests/**`, `pyproject.toml`, `uv.lock` | Execution tests run for maintainers only (requires API key) |
+| **notebook-quality** | `.ipynb`, `pyproject.toml`, `uv.lock` | |
+| **notebook-diff-comment** | `.ipynb` | |
+| **claude-pr-review** | `.ipynb`, `.py`, `.github/workflows/**`, `pyproject.toml`, `uv.lock` | Also triggers on `ready_for_review` |
+| **claude-model-check** | `.ipynb`, `.py`, `.md` | |
+| **claude-link-review** | `.md`, `.mdx`, `.ipynb`, `README.md` | |
+| **links** | All files (no path filter) | |
+| **verify-authors** | `authors.yaml`, `registry.yaml` | |
+
+### On Push to main (4 workflows)
+
+- **lint-format** — `.py`, `.ipynb`
+- **notebook-tests** — `.ipynb`, `tests/notebook_tests/**`
+- **notebook-quality** — `.ipynb`
+- **verify-authors** — `authors.yaml`, `registry.yaml`
+
+### Scheduled
+
+- **links** — every Sunday at UTC 00:00 (`cron: "0 0 * * SUN"`) for full link validation
+
+### Manual (`workflow_dispatch`)
+
+These also support manual triggering from the GitHub Actions page:
+- **claude-link-review**, **claude-model-check**, **claude-pr-review** — accept a PR number as input
+- **links** — no parameters needed
 
 ## Slash Commands
 
-These commands are available in Claude Code and CI:
-
-- `/notebook-review` - Review notebook quality
-- `/model-check` - Validate Claude model references
-- `/link-review` - Check links in changed files
-
-## Project Structure
-
-```
-capabilities/      # Core Claude capabilities (RAG, classification, etc.)
-skills/            # Advanced skill-based notebooks
-tool_use/          # Tool use and integration patterns
-multimodal/        # Vision and image processing
-misc/              # Batch processing, caching, utilities
-third_party/       # Pinecone, Voyage, Wikipedia integrations
-extended_thinking/ # Extended reasoning patterns
-scripts/           # Validation scripts
-.claude/           # Claude Code commands and skills
-```
+- `/notebook-review` — Review notebook quality
+- `/model-check` — Validate Claude model references
+- `/link-review` — Check links in changed files
+- `/add-registry` — Add a notebook entry to registry.yaml
+- `/review-pr` — Review an open pull request
+- `/cookbook-audit` — Audit a notebook against the style rubric
 
 ## Adding a New Cookbook
 
 1. Create notebook in the appropriate directory
-2. Add entry to `registry.yaml` with title, description, path, authors, categories
-3. Add author info to `authors.yaml` if new contributor
-4. Run quality checks and submit PR
+2. Add entry to `registry.yaml` (required fields: `title`, `path`, `categories`, `authors`, `date`)
+3. Add author info to `authors.yaml` if new contributor (kept alphabetically sorted)
+4. Run `make check` and submit PR
+
+### registry.yaml Entry Format
+
+```yaml
+- title: My Cookbook Title
+  description: Brief description of what this cookbook demonstrates.
+  path: capabilities/my_cookbook.ipynb
+  authors:
+  - github-username
+  date: 'YYYY-MM-DD'
+  categories:
+  - Tools          # Valid: Agent Patterns, Claude Agent SDK, Evals, Fine-Tuning,
+                   #   Multimodal, Integrations, Observability, RAG & Retrieval,
+                   #   Responses, Skills, Thinking, Tools
+```
